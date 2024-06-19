@@ -1,6 +1,5 @@
 ﻿using Azure.Identity;
 using Microsoft.Extensions.Configuration;
-
 namespace CustomerJsonData
 {
     class Program
@@ -12,7 +11,6 @@ namespace CustomerJsonData
                 ConfigurationBuilder builder = new ConfigurationBuilder();
                 builder.AddAzureKeyVault(new Uri(Properties.Settings.Default.KeyVaultURI), new DefaultAzureCredential());
                 IConfiguration configuration = builder.Build();
-
                 CustomerJsonData customerData = new CustomerJsonData(configuration);
                 customerData.LoadCustmerData();
             }
@@ -23,8 +21,7 @@ namespace CustomerJsonData
                 IConfiguration configuration = builder.Build();
                 Logger logger = new Logger(configuration);
                 logger.ErrorLogData(ex, ex.Message);
-            }
-            
+            }           
         }
     }
 }

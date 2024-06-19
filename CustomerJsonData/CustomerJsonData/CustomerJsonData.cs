@@ -8,39 +8,29 @@ using System.Data;
 using System.Data.SqlClient;
 using ErrorEventArgs = Newtonsoft.Json.Serialization.ErrorEventArgs;
 
-
 namespace CustomerJsonData
 {
     public class CustomerJsonData
     {
-
         private readonly IConfiguration _configuration;
         readonly string containerName = Properties.Settings.Default.ContainerName;
         readonly string blobDirectoryPrefix = Properties.Settings.Default.BlobDirectoryPrefix;
         readonly string destblobDirectoryPrefix = Properties.Settings.Default.DestDirectory;
-
         public CustomerJsonData(IConfiguration configuration)
         {
             _configuration = configuration;
         }
-
         public void LoadCustmerData()
         {
             try
             {
                 List<BlobEntity> blobList = new List<BlobEntity>();
                 var storageKey = _configuration["StorageKey"];
-
                 var storageAccount = CloudStorageAccount.Parse(storageKey);
                 var myClient = storageAccount.CreateCloudBlobClient();
-                var container = myClient.GetContainerReference(containerName);
-
-                
+                var container = myClient.GetContainerReference(containerName); 
                 var list = container.ListBlobs().OfType<CloudBlobDirectory>().ToList();
-
-                var blobListDirectory = list[0].ListBlobs().OfType<CloudBlobDirectory>().ToList();
-               // var blobListDirectorySap = blobListDirectory[0].ListBlobs().OfType<CloudBlobDirectory>().ToList();
-
+                var blobListDirectory = list[0].ListBlobs().OfType<CloudBlobDirectory>().ToList();              
                 foreach (var blobDirectory in blobListDirectory)
                 {
                     if (blobDirectory.Prefix == blobDirectoryPrefix)
@@ -53,14 +43,12 @@ namespace CustomerJsonData
                             string[] fileDateTime = filename[0].Split(new char[] { '_' });
                             string fileCreatedDateTime = fileDateTime[1] + fileDateTime[2];
                             string formatString = "yyyyMMddHHmmss";
-
                             CloudBlockBlob blockBlob = container.GetBlockBlobReference(blobFile.Name);
                             blobDetails.Blob = blockBlob;
                             blobDetails.FileName = blobName[2];
                             blobDetails.FileCreatedDate = DateTime.ParseExact(fileCreatedDateTime, formatString, null);
                             blobDetails.FileData = blockBlob.DownloadTextAsync().Result;
                             blobDetails.BlobName = blobFile.Name;
-
                             blobList.Add(blobDetails);
                         }
                         blobList.OrderByDescending(x => x.FileCreatedDate.Date).ThenByDescending(x => x.FileCreatedDate.TimeOfDay).ToList();
@@ -71,7 +59,6 @@ namespace CustomerJsonData
                 {
                     CheckRequiredFields(blobDetails, container);
                 }
-
             }
             catch (StorageException ex)
             {
@@ -83,7 +70,6 @@ namespace CustomerJsonData
                 logger.ErrorLogData(ex, ex.Message);
             }
         }
-
         private void CheckRequiredFields(BlobEntity blobDetails, CloudBlobContainer container)
         {
             try
@@ -112,7 +98,6 @@ namespace CustomerJsonData
                         Converters = { new IsoDateTimeConverter() }
                     });
                     Dictionary<string, int> returnData = new Dictionary<string, int>();
-
                     if (customerdataList == null)
                     {
                         returnData.Add("Customer", 0);
@@ -193,7 +178,6 @@ namespace CustomerJsonData
                                         customerDBEntity.SalesPolicyId = payLoad.SalesPolicyId;
                                         customerDBEntity.BottlerTr = payLoad.TradeChannel;
                                         customerDBEntity.POType = payLoad.POType;
-
                                         if (string.IsNullOrEmpty(salesArea.IsDeleted))
                                         {
                                             customerDBEntity.IsDeleted = "N";
@@ -202,17 +186,13 @@ namespace CustomerJsonData
                                         {
                                             customerDBEntity.IsDeleted = salesArea.IsDeleted;
                                         }
-
                                         var return_Customer = SaveCustomerData(customerDBEntity);
                                         returnData.Add("Customer" + countCustomer, return_Customer);
                                     }
                                 }
                             }
-
-                        }
-                        
+                        }                        
                     }
-
                     foreach (var returnvalue in returnData)
                     {
                         if (returnvalue.Value == 0)
@@ -245,7 +225,6 @@ namespace CustomerJsonData
                 logger.ErrorLogData(ex, ex.Message);
             }
         }
-
         private int SaveCustomerData(CustomerDBEntity customerdata)
         {
             try
@@ -311,7 +290,6 @@ namespace CustomerJsonData
             }
             return 0;
         }
-
         public void MoveFile(BlobEntity blob, CloudBlobContainer destContainer, string destDirectory)
         {
             CloudBlockBlob destBlob;
@@ -323,15 +301,13 @@ namespace CustomerJsonData
                 if (!destContainer.Exists())
                     throw new Exception("Destination container does not exist.");
 
-                //Copy source blob to destination container
                 string name = blob.FileName;
                 if (destDirectory != "" && blob.Status == "Success")
                     destBlob = destContainer.GetBlockBlobReference(destDirectory + "\\Success\\" + name);
                 else
                     destBlob = destContainer.GetBlockBlobReference(destDirectory + "\\Error\\" + name);
 
-                destBlob.StartCopy(blob.Blob);
-                //remove source blob after copy is done.
+                destBlob.StartCopy(blob.Blob);              
                 blob.Blob.Delete();
             }
             catch (Exception ex)
@@ -346,8 +322,6 @@ namespace CustomerJsonData
                 logger.ErrorLogData(ex, ex.Message);
             }
         }
-
-
         public void SaveErrorLogData(ErrorLogEntity errorLogData)
         {
             try
@@ -363,14 +337,11 @@ namespace CustomerJsonData
                 con.Open();
                 cmd.ExecuteNonQuery();
                 con.Close();
-
-
             }
             catch (Exception)
             {
 
             }
         }
-
     }
 }

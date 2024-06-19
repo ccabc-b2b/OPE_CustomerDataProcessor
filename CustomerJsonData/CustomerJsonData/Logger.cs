@@ -13,7 +13,6 @@ namespace CustomerJsonData
         {
             _configuration = configuration;
         }
-
         public async void ErrorLogData(Exception ex, string errorMessage)
         {
             var channel = new InMemoryChannel();
@@ -29,13 +28,9 @@ namespace CustomerJsonData
                         configureApplicationInsightsLoggerOptions: (options) => { }
                     );
                 });
-
                 IServiceProvider serviceProvider = services.BuildServiceProvider();
                 ILogger<Program> logger = serviceProvider.GetRequiredService<ILogger<Program>>();
-
-                // logger.LogInformation(errorMessage);
                 logger.LogError(ex, errorMessage);
-
             }
             finally
             {
@@ -43,8 +38,6 @@ namespace CustomerJsonData
                 await Task.Delay(TimeSpan.FromMilliseconds(1000));
                 System.Environment.Exit(0);
             }
-
-
         }
     }
 }
