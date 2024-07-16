@@ -70,7 +70,7 @@ namespace CustomerJsonData
                     var errorLog = new ErrorLogEntity();
                     errorLog.PipeLineName = "Customer";
                     errorLog.ErrorMessage = "No source folder present in the container";
-                    SaveErrorLogData(errorLog);
+                    //SaveErrorLogData(errorLog);
                     Logger logger = new Logger(_configuration);
                     logger.ErrorLogData(null, errorLog.ErrorMessage);
                 }
@@ -80,7 +80,7 @@ namespace CustomerJsonData
                 var errorLog = new ErrorLogEntity();
                 errorLog.PipeLineName = "Customer";
                 errorLog.ErrorMessage = ex.Message;
-                SaveErrorLogData(errorLog);
+                //SaveErrorLogData(errorLog);
                 Logger logger = new Logger(_configuration);
                 logger.ErrorLogData(ex, ex.Message);
             }
@@ -89,7 +89,7 @@ namespace CustomerJsonData
                 var errorLog = new ErrorLogEntity();
                 errorLog.PipeLineName = "Customer";
                 errorLog.ErrorMessage = ex.Message;
-                SaveErrorLogData(errorLog);
+                //SaveErrorLogData(errorLog);
                 Logger logger = new Logger(_configuration);
                 logger.ErrorLogData(ex, ex.Message);
             }
@@ -129,7 +129,7 @@ namespace CustomerJsonData
                         errorLog.PipeLineName = "Customer";
                         errorLog.FileName = blobDetails.FileName;
                         errorLog.ErrorMessage = errors[0];
-                        SaveErrorLogData(errorLog);
+                        //SaveErrorLogData(errorLog);
                         Logger logger = new Logger(_configuration);
                         logger.ErrorLogData(null, errors[0]);
                     }
@@ -224,7 +224,7 @@ namespace CustomerJsonData
                             errorLog2.PipeLineName = "Customer";
                             errorLog2.FileName = blobDetails.FileName;
                             errorLog2.ParentNodeName = returnvalue.Key;
-                            SaveErrorLogData(errorLog2);
+                            //SaveErrorLogData(errorLog2);
                             break;
                         }
                         else
@@ -242,7 +242,7 @@ namespace CustomerJsonData
                 errorLog.PipeLineName = "Customer";
                 errorLog.ParentNodeName = "CheckRequiredFields";
                 errorLog.ErrorMessage = ex.Message;
-                SaveErrorLogData(errorLog);
+                //SaveErrorLogData(errorLog);
                 Logger logger = new Logger(_configuration);
                 logger.ErrorLogData(ex, ex.Message);
             }
@@ -307,7 +307,7 @@ namespace CustomerJsonData
                     errorLog.PipeLineName = "Customer";
                     errorLog.ParentNodeName = "Customer Save";
                     errorLog.ErrorMessage = ex.Message;
-                    SaveErrorLogData(errorLog);
+                    //SaveErrorLogData(errorLog);
                     Logger logger = new Logger(_configuration);
                     logger.ErrorLogData(ex, ex.Message);
                 }
@@ -341,7 +341,7 @@ namespace CustomerJsonData
                 errorLog.FileName = blob.FileName;
                 errorLog.ParentNodeName = "Customer move";
                 errorLog.ErrorMessage = ex.Message;
-                SaveErrorLogData(errorLog);
+                //SaveErrorLogData(errorLog);
                 Logger logger = new Logger(_configuration);
                 logger.ErrorLogData(ex, ex.Message);
             }
