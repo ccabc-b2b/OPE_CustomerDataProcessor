@@ -4,8 +4,11 @@ using Microsoft.Azure.Storage.Blob;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Linq;
 using ErrorEventArgs = Newtonsoft.Json.Serialization.ErrorEventArgs;
 
 namespace CustomerJsonData
@@ -20,7 +23,7 @@ namespace CustomerJsonData
         {
             _configuration = configuration;
         }
-        public void LoadCustmerData()
+        public void LoadCustomerData()
         {
             try
             {
@@ -28,39 +31,60 @@ namespace CustomerJsonData
                 var storageKey = _configuration["StorageKey"];
                 var storageAccount = CloudStorageAccount.Parse(storageKey);
                 var myClient = storageAccount.CreateCloudBlobClient();
-                var container = myClient.GetContainerReference(containerName); 
+                var container = myClient.GetContainerReference(containerName);
                 var list = container.ListBlobs().OfType<CloudBlobDirectory>().ToList();
-                var blobListDirectory = list[0].ListBlobs().OfType<CloudBlobDirectory>().ToList();              
-                foreach (var blobDirectory in blobListDirectory)
+                if (list != null && list.Count > 0)
                 {
-                    if (blobDirectory.Prefix == blobDirectoryPrefix)
+                    var blobListDirectory = list[0].ListBlobs().OfType<CloudBlobDirectory>().ToList();
+                    foreach (var blobDirectory in blobListDirectory)
                     {
-                        foreach (var blobFile in blobDirectory.ListBlobs().OfType<CloudBlockBlob>())
+                        if (blobDirectory.Prefix == blobDirectoryPrefix)
                         {
-                            BlobEntity blobDetails = new BlobEntity();
-                            string[] blobName = blobFile.Name.Split(new char[] { '/' });
-                            string[] filename = blobName[2].Split(new char[] { '.' });
-                            string[] fileDateTime = filename[0].Split(new char[] { '_' });
-                            string fileCreatedDateTime = fileDateTime[1] + fileDateTime[2];
-                            string formatString = "yyyyMMddHHmmss";
-                            CloudBlockBlob blockBlob = container.GetBlockBlobReference(blobFile.Name);
-                            blobDetails.Blob = blockBlob;
-                            blobDetails.FileName = blobName[2];
-                            blobDetails.FileCreatedDate = DateTime.ParseExact(fileCreatedDateTime, formatString, null);
-                            blobDetails.FileData = blockBlob.DownloadTextAsync().Result;
-                            blobDetails.BlobName = blobFile.Name;
-                            blobList.Add(blobDetails);
+                            foreach (var blobFile in blobDirectory.ListBlobs().OfType<CloudBlockBlob>())
+                            {
+                                BlobEntity blobDetails = new BlobEntity();
+                                string[] blobName = blobFile.Name.Split(new char[] { '/' });
+                                string[] filename = blobName[2].Split(new char[] { '.' });
+                                string[] fileDateTime = filename[0].Split(new char[] { '_' });
+                                string fileCreatedDateTime = fileDateTime[1] + fileDateTime[2];
+                                string formatString = "yyyyMMddHHmmss";
+                                CloudBlockBlob blockBlob = container.GetBlockBlobReference(blobFile.Name);
+                                blobDetails.Blob = blockBlob;
+                                blobDetails.FileName = blobName[2];
+                                blobDetails.FileCreatedDate = DateTime.ParseExact(fileCreatedDateTime, formatString, null);
+                                blobDetails.FileData = blockBlob.DownloadTextAsync().Result;
+                                blobDetails.BlobName = blobFile.Name;
+                                blobList.Add(blobDetails);
+                            }
+                            blobList.OrderByDescending(x => x.FileCreatedDate.Date).ThenByDescending(x => x.FileCreatedDate.TimeOfDay).ToList();
                         }
-                        blobList.OrderByDescending(x => x.FileCreatedDate.Date).ThenByDescending(x => x.FileCreatedDate.TimeOfDay).ToList();
+                    }
+
+                    foreach (var blobDetails in blobList)
+                    {
+                        CheckRequiredFields(blobDetails, container);
                     }
                 }
-
-                foreach (var blobDetails in blobList)
+                else
                 {
-                    CheckRequiredFields(blobDetails, container);
+                    var errorLog = new ErrorLogEntity();
+                    errorLog.PipeLineName = "Customer";
+                    errorLog.ErrorMessage = "No source folder present in the container";
+                    SaveErrorLogData(errorLog);
+                    Logger logger = new Logger(_configuration);
+                    logger.ErrorLogData(null, errorLog.ErrorMessage);
                 }
             }
             catch (StorageException ex)
+            {
+                var errorLog = new ErrorLogEntity();
+                errorLog.PipeLineName = "Customer";
+                errorLog.ErrorMessage = ex.Message;
+                SaveErrorLogData(errorLog);
+                Logger logger = new Logger(_configuration);
+                logger.ErrorLogData(ex, ex.Message);
+            }
+            catch (Exception ex)
             {
                 var errorLog = new ErrorLogEntity();
                 errorLog.PipeLineName = "Customer";
@@ -86,13 +110,13 @@ namespace CustomerJsonData
                     logger.ErrorLogData(null, "File is empty");
                 }
                 else
-                {                 
+                {
                     CustomerJsonEntity customerdataList = JsonConvert.DeserializeObject<CustomerJsonEntity>(blobDetails.FileData, new JsonSerializerSettings
                     {
                         Error = delegate (object sender, ErrorEventArgs args)
                         {
-                            errors.Add(args.ErrorContext.Error.Message);
-                            args.ErrorContext.Handled = true;
+                                errors.Add(args.ErrorContext.Error.Message);
+                                args.ErrorContext.Handled = true;
 
                         },
                         Converters = { new IsoDateTimeConverter() }
@@ -111,7 +135,6 @@ namespace CustomerJsonData
                     }
                     else
                     {
-                        int countCustomer = 0;
                         foreach (var payLoad in customerdataList.payload)
                         {
                             if (string.IsNullOrEmpty(payLoad.CustomerNumber))
@@ -127,7 +150,7 @@ namespace CustomerJsonData
                                 returnData.Add("CustomerSalesArea is null", 0);
                             }
                             else
-                            {                              
+                            {
                                 foreach (var salesArea in payLoad.CustomerSalesArea)
                                 {
                                     if (string.IsNullOrEmpty(salesArea.SalesOrg))
@@ -144,7 +167,6 @@ namespace CustomerJsonData
                                     }
                                     else
                                     {
-                                        countCustomer++;
                                         var customerDBEntity = new CustomerDBEntity();
                                         customerDBEntity.CustomerNumber = payLoad.CustomerNumber;
                                         customerDBEntity.CompanyCode = payLoad.CompanyCode;
@@ -187,11 +209,11 @@ namespace CustomerJsonData
                                             customerDBEntity.IsDeleted = salesArea.IsDeleted;
                                         }
                                         var return_Customer = SaveCustomerData(customerDBEntity);
-                                        returnData.Add("Customer" + countCustomer, return_Customer);
+                                        returnData.Add("Customer" + payLoad.CustomerNumber, return_Customer);
                                     }
                                 }
                             }
-                        }                        
+                        }
                     }
                     foreach (var returnvalue in returnData)
                     {
@@ -214,7 +236,7 @@ namespace CustomerJsonData
                 var destDirectory = destblobDirectoryPrefix + DateTime.Now.Year + "/" + DateTime.Now.Month + "/" + DateTime.Now.Day;
                 MoveFile(blobDetails, container, destDirectory);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 var errorLog = new ErrorLogEntity();
                 errorLog.PipeLineName = "Customer";
@@ -227,66 +249,68 @@ namespace CustomerJsonData
         }
         private int SaveCustomerData(CustomerDBEntity customerdata)
         {
-            try
+            using (SqlConnection connection = new SqlConnection(_configuration["DatabaseConnectionString"]))
             {
-                SqlConnection con = new SqlConnection(_configuration["DatabaseConnectionString"]);
-                SqlCommand cmd = new SqlCommand("Customer_save", con);
-                cmd.CommandType = CommandType.StoredProcedure;
-                cmd.Parameters.AddWithValue("@CustomerNumber", customerdata.CustomerNumber);
-                cmd.Parameters.AddWithValue("@CompanyCode", customerdata.CompanyCode);
-                cmd.Parameters.AddWithValue("@IndustryCode1", customerdata.IndustryCode1);
-                cmd.Parameters.AddWithValue("@BusinessTypeId", customerdata.BusinessTypeId);
-                cmd.Parameters.AddWithValue("@CustomerGroup", customerdata.CustomerGroup);
-                cmd.Parameters.AddWithValue("@DistributionChannel", customerdata.DistributionChannel);
-                cmd.Parameters.AddWithValue("@Division", customerdata.Division);
-                cmd.Parameters.AddWithValue("@PaymentTerms", customerdata.PaymentTerms);
-                cmd.Parameters.AddWithValue("@SalesGroup", customerdata.SalesGroup);
-                cmd.Parameters.AddWithValue("@SalesOffice", customerdata.SalesOffice);
-                cmd.Parameters.AddWithValue("@SalesOrg", customerdata.SalesOrg);
-                cmd.Parameters.AddWithValue("@CustomerClass", customerdata.CustomerClass);
-                cmd.Parameters.AddWithValue("@CustomerSubTrade", customerdata.CustomerSubTrade);             
-                cmd.Parameters.AddWithValue("@DeliveringPlant", customerdata.DeliveringPlant);
-                cmd.Parameters.AddWithValue("@SalesRoute", customerdata.SalesRoute);
-                cmd.Parameters.AddWithValue("@SalesRepId", customerdata.SalesRepId);                
-                cmd.Parameters.AddWithValue("@ExportCountryCode", customerdata.ExportCountryCode);
-                cmd.Parameters.AddWithValue("@Region", customerdata.Region);
-                cmd.Parameters.AddWithValue("@CustomerPriceGroup", customerdata.CustomerPriceGroup);
-                cmd.Parameters.AddWithValue("@PricingProcedure", customerdata.PricingProcedure);
-                cmd.Parameters.AddWithValue("@PriceListType", customerdata.PriceListType);
-                cmd.Parameters.AddWithValue("@TaxClassification", customerdata.TaxClassification);
-                cmd.Parameters.AddWithValue("@SalesDistrict", customerdata.SalesDistrict);
-                cmd.Parameters.AddWithValue("@IncoTerms1", customerdata.IncoTerms1);
-                cmd.Parameters.AddWithValue("@TaxCountry", customerdata.TaxCountry);
-                cmd.Parameters.AddWithValue("@TaxCategory", customerdata.TaxCategory);
-                cmd.Parameters.AddWithValue("@IndustryKey", customerdata.IndustryKey);
-                cmd.Parameters.AddWithValue("@PartnerNumber", customerdata.PartnerNumber);              
-                cmd.Parameters.AddWithValue("@IsDeleted", customerdata.IsDeleted);
-                cmd.Parameters.AddWithValue("@SalesPolicyId", customerdata.SalesPolicyId);
-                cmd.Parameters.AddWithValue("@BottlerTr", customerdata.BottlerTr);
-                cmd.Parameters.AddWithValue("@POType", customerdata.POType);
-                cmd.Parameters.Add("@returnObj", System.Data.SqlDbType.BigInt).Direction = System.Data.ParameterDirection.Output;
-                con.Open();
-                int retval = cmd.ExecuteNonQuery();
-                con.Close();
-                if (retval != 0)
+                try
                 {
-                    return retval;
+                    SqlCommand cmd = new SqlCommand("Customer_save", connection);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@CustomerNumber", customerdata.CustomerNumber);
+                    cmd.Parameters.AddWithValue("@CompanyCode", customerdata.CompanyCode);
+                    cmd.Parameters.AddWithValue("@IndustryCode1", customerdata.IndustryCode1);
+                    cmd.Parameters.AddWithValue("@BusinessTypeId", customerdata.BusinessTypeId);
+                    cmd.Parameters.AddWithValue("@CustomerGroup", customerdata.CustomerGroup);
+                    cmd.Parameters.AddWithValue("@DistributionChannel", customerdata.DistributionChannel);
+                    cmd.Parameters.AddWithValue("@Division", customerdata.Division);
+                    cmd.Parameters.AddWithValue("@PaymentTerms", customerdata.PaymentTerms);
+                    cmd.Parameters.AddWithValue("@SalesGroup", customerdata.SalesGroup);
+                    cmd.Parameters.AddWithValue("@SalesOffice", customerdata.SalesOffice);
+                    cmd.Parameters.AddWithValue("@SalesOrg", customerdata.SalesOrg);
+                    cmd.Parameters.AddWithValue("@CustomerClass", customerdata.CustomerClass);
+                    cmd.Parameters.AddWithValue("@CustomerSubTrade", customerdata.CustomerSubTrade);
+                    cmd.Parameters.AddWithValue("@DeliveringPlant", customerdata.DeliveringPlant);
+                    cmd.Parameters.AddWithValue("@SalesRoute", customerdata.SalesRoute);
+                    cmd.Parameters.AddWithValue("@SalesRepId", customerdata.SalesRepId);
+                    cmd.Parameters.AddWithValue("@ExportCountryCode", customerdata.ExportCountryCode);
+                    cmd.Parameters.AddWithValue("@Region", customerdata.Region);
+                    cmd.Parameters.AddWithValue("@CustomerPriceGroup", customerdata.CustomerPriceGroup);
+                    cmd.Parameters.AddWithValue("@PricingProcedure", customerdata.PricingProcedure);
+                    cmd.Parameters.AddWithValue("@PriceListType", customerdata.PriceListType);
+                    cmd.Parameters.AddWithValue("@TaxClassification", customerdata.TaxClassification);
+                    cmd.Parameters.AddWithValue("@SalesDistrict", customerdata.SalesDistrict);
+                    cmd.Parameters.AddWithValue("@IncoTerms1", customerdata.IncoTerms1);
+                    cmd.Parameters.AddWithValue("@TaxCountry", customerdata.TaxCountry);
+                    cmd.Parameters.AddWithValue("@TaxCategory", customerdata.TaxCategory);
+                    cmd.Parameters.AddWithValue("@IndustryKey", customerdata.IndustryKey);
+                    cmd.Parameters.AddWithValue("@PartnerNumber", customerdata.PartnerNumber);
+                    cmd.Parameters.AddWithValue("@IsDeleted", customerdata.IsDeleted);
+                    cmd.Parameters.AddWithValue("@SalesPolicyId", customerdata.SalesPolicyId);
+                    cmd.Parameters.AddWithValue("@BottlerTr", customerdata.BottlerTr);
+                    cmd.Parameters.AddWithValue("@POType", customerdata.POType);
+                    cmd.Parameters.Add("@returnObj", SqlDbType.BigInt).Direction = ParameterDirection.Output;
+                    connection.Open();
+                    int retval = cmd.ExecuteNonQuery();
+                    connection.Close();
+                    if (retval != 0)
+                    {
+                        return retval;
+                    }
+                    else
+                    {
+                        return 0;
+                    }
+
                 }
-                else
+                catch (Exception ex)
                 {
-                    return 0;
+                    var errorLog = new ErrorLogEntity();
+                    errorLog.PipeLineName = "Customer";
+                    errorLog.ParentNodeName = "Customer Save";
+                    errorLog.ErrorMessage = ex.Message;
+                    SaveErrorLogData(errorLog);
+                    Logger logger = new Logger(_configuration);
+                    logger.ErrorLogData(ex, ex.Message);
                 }
-            }
-            catch (Exception ex)
-            {
-                var errorLog = new ErrorLogEntity();
-                errorLog.PipeLineName = "Customer";
-                errorLog.ParentNodeName = "Customer Save";
-                errorLog.ErrorMessage = ex.Message;
-                SaveErrorLogData(errorLog);
-                Logger logger = new Logger(_configuration);
-                logger.ErrorLogData(ex, ex.Message);
-                
             }
             return 0;
         }
@@ -307,7 +331,7 @@ namespace CustomerJsonData
                 else
                     destBlob = destContainer.GetBlockBlobReference(destDirectory + "\\Error\\" + name);
 
-                destBlob.StartCopy(blob.Blob);              
+                destBlob.StartCopy(blob.Blob);
                 blob.Blob.Delete();
             }
             catch (Exception ex)
@@ -324,23 +348,24 @@ namespace CustomerJsonData
         }
         public void SaveErrorLogData(ErrorLogEntity errorLogData)
         {
-            try
+            using (SqlConnection con = new SqlConnection(_configuration["DatabaseConnectionString"]))
             {
+                try
+                {
+                    SqlCommand cmd = new SqlCommand("ErrorLogDetails_save", con);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@PipeLineName", errorLogData.PipeLineName);
+                    cmd.Parameters.AddWithValue("@FileName", errorLogData.FileName);
+                    cmd.Parameters.AddWithValue("@ParentNodeName", errorLogData.ParentNodeName);
+                    cmd.Parameters.AddWithValue("@ErrorMessage", errorLogData.ErrorMessage);
+                    con.Open();
+                    cmd.ExecuteNonQuery();
+                    con.Close();
+                }
+                catch (Exception)
+                {
 
-                SqlConnection con = new SqlConnection(_configuration["DatabaseConnectionString"]);
-                SqlCommand cmd = new SqlCommand("ErrorLogDetails_save", con);
-                cmd.CommandType = CommandType.StoredProcedure;
-                cmd.Parameters.AddWithValue("@PipeLineName", errorLogData.PipeLineName);
-                cmd.Parameters.AddWithValue("@FileName", errorLogData.FileName);
-                cmd.Parameters.AddWithValue("@ParentNodeName", errorLogData.ParentNodeName);
-                cmd.Parameters.AddWithValue("@ErrorMessage", errorLogData.ErrorMessage);
-                con.Open();
-                cmd.ExecuteNonQuery();
-                con.Close();
-            }
-            catch (Exception)
-            {
-
+                }
             }
         }
     }

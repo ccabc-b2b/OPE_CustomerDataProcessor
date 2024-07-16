@@ -34,19 +34,19 @@ namespace CustomerJsonData.Properties {
         
         [global::System.Configuration.ApplicationScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("source/process/customer/")]
-        public string DestDirectory {
+        [global::System.Configuration.DefaultSettingValueAttribute("source/customer/")]
+        public string BlobDirectoryPrefix {
             get {
-                return ((string)(this["DestDirectory"]));
+                return ((string)(this["BlobDirectoryPrefix"]));
             }
         }
         
         [global::System.Configuration.ApplicationScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("source/customer/")]
-        public string BlobDirectoryPrefix {
+        [global::System.Configuration.DefaultSettingValueAttribute("source/process/customer/")]
+        public string DestDirectory {
             get {
-                return ((string)(this["BlobDirectoryPrefix"]));
+                return ((string)(this["DestDirectory"]));
             }
         }
         

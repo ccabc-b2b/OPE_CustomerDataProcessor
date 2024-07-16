@@ -1,4 +1,6 @@
-﻿namespace CustomerJsonData.Models
+﻿using System.Collections.Generic;
+
+namespace CustomerJsonData.Models
 {
     public class Payload
     {
