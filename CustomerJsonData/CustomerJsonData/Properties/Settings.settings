@@ -12,7 +12,7 @@
       <Value Profile="(Default)">source/process/customer/</Value>
     </Setting>
     <Setting Name="KeyVaultURI" Type="System.String" Scope="Application">
-      <Value Profile="(Default)">https://kv-gccb-ope-qas.vault.azure.net/</Value>
+      <Value Profile="(Default)">__KeyVaultURI__</Value>
     </Setting>
   </Settings>
 </SettingsFile>

@@ -186,7 +186,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.Prod.config" />
-    <None Include="App -QA.config" />
+    <None Include="App .QA.config" />
     <None Include="App.config" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
